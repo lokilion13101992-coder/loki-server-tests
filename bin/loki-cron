@@ -1,0 +1,80 @@
+#!/bin/bash
+# =========================================================
+# LOKI CRON — Автоматические задачи мониторинга и обслуживания
+# Запускается по cron расписанию
+# =========================================================
+
+PYTHON=/root/nexus-core/api/venv/bin/python
+NEXUS_CORE=/root/nexus-core
+LOG_DIR=/var/log/loki
+mkdir -p $LOG_DIR
+
+LOG_FILE="$LOG_DIR/cron-$(date +%Y%m%d).log"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> $LOG_FILE
+}
+
+case "$1" in
+    health-check)
+        log "Running health check..."
+        export PYTHONPATH=$NEXUS_CORE
+        RESULT=$($PYTHON $NEXUS_CORE/bin/loki diagnose 2>&1)
+        if echo "$RESULT" | grep -q "All systems nominal"; then
+            log "Health check: OK"
+        else
+            log "Health check: ISSUES DETECTED"
+            log "$RESULT"
+            # Пробуем починить
+            log "Running auto-heal..."
+            $PYTHON $NEXUS_CORE/bin/loki "почини" >> $LOG_FILE 2>&1
+        fi
+        ;;
+
+    backup-db)
+        log "Running database backup..."
+        BACKUP_DIR=/backup
+        mkdir -p $BACKUP_DIR
+
+        # PostgreSQL backup
+        docker exec nexus_postgres pg_dump -U nexus nexusdb | gzip > $BACKUP_DIR/nexusdb-$(date +%Y%m%d-%H%M%S).sql.gz
+        log "PostgreSQL backup done"
+
+        # MySQL backup
+        mysqldump -u root -puwuIxf1juS --all-databases | gzip > $BACKUP_DIR/mysql-all-$(date +%Y%m%d-%H%M%S).sql.gz
+        log "MySQL backup done"
+
+        # Удаляем бэкапы старше 7 дней
+        find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
+        log "Old backups cleaned"
+        ;;
+
+    cleanup)
+        log "Running cleanup..."
+
+        # Очистка старых логов Loki
+        find $LOG_DIR -name "*.log" -mtime +30 -delete
+
+        # Очистка Docker
+        docker system prune -f >> $LOG_FILE 2>&1
+
+        # Очистка старых Nexus задач
+        export PYTHONPATH=$NEXUS_CORE
+        $PYTHON -c "
+import sqlite3, time
+db = '$NEXUS_CORE/api/nexus_jobs.db'
+if __import__('os').path.exists(db):
+    conn = sqlite3.connect(db)
+    conn.execute('DELETE FROM jobs WHERE status IN (\"done\",\"error\")')
+    conn.commit()
+    conn.close()
+" >> $LOG_FILE 2>&1
+
+        log "Cleanup done"
+        ;;
+
+    *)
+        echo "Usage: loki-cron {health-check|backup-db|cleanup}"
+        exit 1
+        ;;
+esac

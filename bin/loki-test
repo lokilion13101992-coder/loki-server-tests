@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+Loki Server Health Check & Test Runner
+Runs all tests and generates a summary report.
+"""
+
+import subprocess
+import sys
+import json
+from datetime import datetime
+
+
+def run_tests():
+    """Run pytest and parse results."""
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short", "-q"],
+        capture_output=True,
+        text=True,
+        cwd="/root/nexus-core"
+    )
+    return result.stdout, result.stderr, result.returncode
+
+
+def generate_report(stdout, stderr, rc):
+    """Generate a human-readable report."""
+    lines = stdout.splitlines()
+    
+    # Parse results
+    passed = stdout.count(" PASSED")
+    failed = stdout.count(" FAILED")
+    skipped = stdout.count(" SKIPPED")
+    total = passed + failed + skipped
+    
+    # Extract failed tests
+    failed_tests = []
+    for line in lines:
+        if "FAILED" in line:
+            failed_tests.append(line.strip())
+    
+    report = []
+    report.append("=" * 60)
+    report.append("  LOKI SERVER HEALTH REPORT")
+    report.append(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append("=" * 60)
+    report.append("")
+    report.append(f"  Total:   {total}")
+    report.append(f"  Passed:  {passed} ✓")
+    report.append(f"  Failed:  {failed} ✗")
+    report.append(f"  Skipped: {skipped} →")
+    report.append(f"  Rate:    {passed/max(total,1)*100:.0f}%")
+    report.append("")
+    
+    if failed_tests:
+        report.append("  FAILED TESTS:")
+        report.append("  " + "-" * 40)
+        for t in failed_tests:
+            report.append(f"  • {t}")
+        report.append("")
+    
+    report.append("=" * 60)
+    
+    if rc == 0:
+        report.append("  STATUS: ALL TESTS PASSED ✓")
+    else:
+        report.append(f"  STATUS: {failed} TESTS FAILED ✗")
+    report.append("=" * 60)
+    
+    return "\n".join(report)
+
+
+if __name__ == "__main__":
+    stdout, stderr, rc = run_tests()
+    report = generate_report(stdout, stderr, rc)
+    print(report)
+    
+    # Also save to file
+    with open("/var/log/loki/test-report.log", "a") as f:
+        f.write(report + "\n\n")
+    
+    sys.exit(rc)

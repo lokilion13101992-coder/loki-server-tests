@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Loki CLI — запуск агента Loki из командной строки."""
+import sys
+import os
+
+# Добавляем корень nexus-core в PATH
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from agents.loki.loki_agent import LokiAgent
+
+agent = LokiAgent()
+
+if len(sys.argv) > 1:
+    task = " ".join(sys.argv[1:])
+    result = agent.run(task)
+    if isinstance(result, str):
+        print(result)
+    else:
+        import json
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+else:
+    print(agent.status())

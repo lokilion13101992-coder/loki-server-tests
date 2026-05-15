@@ -1,0 +1,25 @@
+#!/bin/bash
+# Запуск Loki Telegram Bot с прокси
+# Использование:
+#   ./loki-bot [proxy_url]
+#
+# Пример:
+#   ./loki-bot https://loki-telegram-proxy.your-login.workers.dev
+
+cd /root/nexus-core
+export PYTHONPATH=/root/nexus-core
+
+PROXY="${1:-}"
+TOKEN_FILE="/root/nexus-core/agents/loki/.bot_token"
+
+if [ ! -f "$TOKEN_FILE" ]; then
+    echo "ERROR: Bot token not found in $TOKEN_FILE"
+    exit 1
+fi
+
+if [ -n "$PROXY" ]; then
+    echo "Using Telegram API proxy: $PROXY"
+    export TELEGRAM_API_FALLBACK="$PROXY"
+fi
+
+exec /root/nexus-core/api/venv/bin/python /root/nexus-core/agents/loki/loki_bot.py

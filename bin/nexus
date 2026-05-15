@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+import sys
+from agents.router.router import TaskRouter
+from agents.core.registry import AgentRegistry
+
+router = TaskRouter()
+registry = AgentRegistry()
+
+def main():
+    if len(sys.argv) < 3:
+        print('Usage:')
+        print('  nexus run "task"        — execute task via agent')
+        print('  nexus agents            — list available agents')
+        print('  nexus route "task"      — show which agent handles task')
+        return
+
+    command = sys.argv[1]
+    task = " ".join(sys.argv[2:])
+
+    if command == "run":
+        agent_name = router.route(task)
+        agent = registry.get(agent_name)
+        result = agent.run(task)
+        if isinstance(result, dict):
+            import json
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+        else:
+            print(result)
+    elif command == "agents":
+        for name in registry.list_agents():
+            print(f"  — {name}")
+    elif command == "route":
+        agent = router.route(task)
+        print(f"Task: {task}")
+        print(f"Agent: {agent}")
+    else:
+        print("Unknown command")
+
+if __name__ == "__main__":
+    main()

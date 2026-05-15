@@ -1,0 +1,13 @@
+from router import TaskRouter
+
+router = TaskRouter()
+
+tests = [
+    "напиши python api",
+    "найди информацию про docker",
+    "сохрани это в память",
+    "сделай анализ системы"
+]
+
+for t in tests:
+    print(t, "→", router.route(t))

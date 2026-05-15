@@ -1,0 +1,20 @@
+[Unit]
+Description=Loki Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/nexus-core
+Environment="PYTHONPATH=/root/nexus-core"
+ExecStart=/root/nexus-core/api/venv/bin/python /root/nexus-core/agents/loki/loki_bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=loki-bot
+
+[Install]
+WantedBy=multi-user.target
