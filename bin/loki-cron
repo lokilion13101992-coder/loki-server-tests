@@ -41,7 +41,7 @@ case "$1" in
         log "PostgreSQL backup done"
 
         # MySQL backup
-        mysqldump -u root -puwuIxf1juS --all-databases | gzip > $BACKUP_DIR/mysql-all-$(date +%Y%m%d-%H%M%S).sql.gz
+        mysqldump --defaults-file=/root/.my.cnf --all-databases | gzip > $BACKUP_DIR/mysql-all-$(date +%Y%m%d-%H%M%S).sql.gz
         log "MySQL backup done"
 
         # Удаляем бэкапы старше 7 дней
