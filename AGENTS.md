@@ -12,8 +12,8 @@
 | Сервис | Порт | Статус | Примечание |
 |--------|------|--------|------------|
 | Nexus Core API | 8000 | Работает | FastAPI, pid 135089 |
-| Loki Dashboard | 8080 | Работает | FastAPI, systemd service |
-| Loki Bot | — | Работает | Telegram bot, systemd service |
+| Loki Dashboard | 8080 | Работает | FastAPI, systemd: loki-dashboard |
+| Loki Bot | — | Работает | Telegram bot, systemd: loki-bot |
 | PostgreSQL 16 | 5432 | Up (docker) | nexus:nexuspass@/nexusdb |
 | Redis 7 | 6379 | Up (docker) | localhost |
 | Qdrant | 6333 | Up (docker) | Vector DB |
@@ -22,12 +22,28 @@
 | ISPmanager | 1500 | Работает | Панель управления |
 | UFW | — | Active | deny incoming |
 | Fail2ban | — | Active | jails: sshd, exim-isp |
+| Watchtower | — | Работает | Docker auto-update, исправлен |
+| Apache2 | — | Masked | Отключён, не используется |
 
 ## Архитектура — Nexus Tree
 
 Всё есть событие. Состояние — производное от лога событий.
 Файлы — листья. Логика живёт в узлах.
-Ядро: events.py → store.py → state.py → kernel.py
+
+```
+NEXUS =
+  Event Stream          ← единственная правда
++ Identity Kernel       ← кто ты, закодировано
++ Attention Engine      ← что важно сейчас
++ Memory (episodic + semantic graph)
++ Reflection Layer      ← система наблюдает за собой
++ Intent Layer          ← живые цели, не мёртвые задачи
++ Scheduler             ← реальность меняется по триггерам
++ Shield                ← защита перед исполнением
++ Learning Loop         ← система растёт
+```
+
+Стадии 1-2 завершены (ствол + корни). Kernel построен. Все 9 тестов зелёные.
 
 ## Инварианты лога событий
 
@@ -43,15 +59,17 @@
 - Модель: /root/nexus-core/models/mistral/openhermes-2.5-mistral-7b.Q4_K_M.gguf
 - Бэкапы: /backup/
 - Hermes home: ~/.hermes/
+- SOUL.md: ~/.hermes/SOUL.md
 - Тесты: /root/nexus-core/tests/
 - Логи: /var/log/loki/
 
-## Лог решений (что пробовали, что сломалось)
+## Лог решений
 
 - v7: монолит — работал но слишком сложный
 - v8: упрощение — потеряли слой контроля
 - v9: архитектура — нестабильная
 - v0.1 kernel: event-sourced, все тесты зелёные ✓
+- 2026-05-16: исправлены все проблемы сервера (watchtower, apache2, mysql, loki bot, loki cron, ssl)
 
 ## Текущие приоритеты
 
