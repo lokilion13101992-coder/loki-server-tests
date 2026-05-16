@@ -214,13 +214,22 @@ class TestServices:
     def test_no_failed_services(self):
         out, _, _ = run("systemctl --failed --no-legend")
         failed = [line for line in out.splitlines() if line.strip()]
-        # apache2 is known to be failed and not used
-        non_critical = ["apache2", "systemd-cron-cleaner"]
+        # systemd-cron-cleaner is known to be missing, apache2 is masked
+        non_critical = ["systemd-cron-cleaner", "apache2"]
         critical_failures = [
             line for line in failed
             if not any(nc in line for nc in non_critical)
         ]
         assert len(critical_failures) == 0, f"Failed services: {critical_failures}"
+
+    def test_apache2_disabled(self):
+        """Apache2 should be masked/disabled (not used)."""
+        out, _, _ = run("systemctl is-enabled apache2 2>/dev/null || echo 'masked'")
+        assert "masked" in out or "disabled" in out, "Apache2 should be disabled"
+
+    def test_mysql_enabled(self):
+        """MySQL should be enabled for autostart."""
+        assert service_enabled("mysql"), "MySQL not enabled for autostart"
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -249,12 +258,10 @@ class TestDockerContainers:
         assert docker_container_running("netdata"), "Netdata container not running"
 
     def test_watchtower_not_restarting(self):
-        """Watchtower should not be in a restart loop — KNOWN ISSUE: currently broken."""
+        """Watchtower should not be in a restart loop."""
         out, _, rc = run("docker inspect watchtower --format '{{.State.Restarting}}'")
         assert rc == 0
-        # TODO: Fix Watchtower Docker API version mismatch
-        # assert out == "False", "Watchtower is in a restart loop"
-        pass  # Known issue — Watchtower restart loop due to Docker API version
+        assert out.lower() == "false", f"Watchtower is in a restart loop (Restarting={out})"
 
     def test_redis_ping(self):
         out, _, rc = run("docker exec nexus_redis redis-cli ping")
@@ -351,14 +358,8 @@ class TestNginx:
         assert tcp_open(80)
 
     def test_port_443_open(self):
-        """Port 443 may not have a cert configured yet — check if nginx serves it."""
-        out, _, rc = run("ss -tlnp | grep ':443 '")
-        # If nginx listens on 443, it should pass
-        if rc == 0:
-            assert True
-        else:
-            # No SSL cert configured yet — skip
-            pass  # TODO: Configure SSL certificate for port 443
+        """Port 443 should be open with SSL."""
+        assert tcp_open(443), "Port 443 (HTTPS) not open"
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -516,14 +517,18 @@ class TestLokiAgent:
         assert len(token) > 0, "Bot token is empty"
 
     def test_dashboard_config(self):
-        """Dashboard should be running — check process or port."""
-        # Check if port 8080 is responding (dashboard was started separately)
-        out, _, rc = run("ss -tlnp | grep 8080")
+        """Dashboard should be running as systemd service."""
+        assert service_active("loki-dashboard"), "Loki Dashboard service not active"
+
+    def test_loki_bot_active(self):
+        """Loki Bot should be running as systemd service."""
+        # Give it a moment to fully start if recently launched
+        out, _, rc = run("systemctl is-active loki-bot")
         if rc != 0:
-            # Dashboard might not be running as a service — that's OK
-            pass  # TODO: Set up Loki Dashboard as systemd service
-        else:
-            assert True
+            import time
+            time.sleep(3)
+            out, _, rc = run("systemctl is-active loki-bot")
+        assert rc == 0, f"Loki Bot service not active: {out}"
 
 
 # ════════════════════════════════════════════════════════════════════
